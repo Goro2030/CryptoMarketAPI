@@ -1,8 +1,7 @@
 # CryptoMarketAPI
-CryptoMarket API Interaction for Google SpreadSheets 
 
-CryptoMarket API Interaction for Google SpreadSheets			
-Version 1.0 ßeta			
+# CryptoMarket API Interaction for Google SpreadSheets			
+# Version 1.0 ßeta			
 			
 Licensed under The MIT License (MIT) ( https:opensource.org/licenses/MIT )			
 			

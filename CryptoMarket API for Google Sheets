@@ -1,0 +1,167 @@
+// CryptoMarket API Interaction for Google SpreadSheets 
+
+// Licensed under The MIT License (MIT) ( https://opensource.org/licenses/MIT ) 
+
+// Copyright (c) 2019 Mariano Daniel Silva ( mariano.silva@gmail.com )
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+//
+// Source code maintained at this "Read Only" Google Sheet, and also on 
+// https://github.com/Goro2030/CryptoMarketAPI (where you can make recommendations, report issues, etc. )			
+//
+// Donations to ETH 0x0150AbF80136eA289860d12Ca01335BdF58AD80d 
+
+/*Bitcoin Balance
+This function returns the total ammount of BitCoin in the address passed as parameter
+@customFunction
+*/
+
+function walletBalance(x) {
+  
+  if (x != undefined) {
+    
+    var url = "https://api.smartbit.com.au/v1/blockchain/address/" + x + "?tx=0";
+    
+    var response = UrlFetchApp.fetch(url);
+    var json = response.getContentText();
+    var data = JSON.parse(json);
+    return parseFloat(data.address.total.balance);   
+  }
+  else return "Please pass a bitcoin address as parameter!"
+    }  
+
+function byteToHex(byte) {
+  // convert the possibly signed byte (-128 to 127) to an unsigned byte (0 to 255).
+  const unsignedByte = byte & 0xff;
+  
+  // If the number can be represented with only 4 bits (0-15), 
+  // the hexadecimal representation of this number is only one char (0-9, a-f). 
+  if (unsignedByte < 16) {
+    return '0' + unsignedByte.toString(16);
+  } else {
+    return unsignedByte.toString(16);
+  }
+}
+
+// bytes is an typed array (Int8Array or Uint8Array)
+function toHexString(bytes) {
+  // Since the .map() method is not available for typed arrays, 
+  // we will convert the typed array to an array using Array.from().
+  
+  a = [];
+  
+  for (var n = 0; n < bytes.length; n++) { 
+    a.push(byteToHex(bytes[n]));
+  }
+  
+  return a;
+}
+
+function CryptoMarketGetAPIKey()
+{ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Configuration').getRange('C2').getValue(); }
+
+function CryptoMarketGetAPISecret()
+{ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Configuration').getRange('C3').getValue(); }
+
+function CryptoMarketGetAPIUrl()
+{ return SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Configuration').getRange('C4').getValue(); }
+
+function CryptoMarketGetBalance(currency) {
+  
+  if (currency === undefined) {
+    currency = "ETH";
+  } 
+  
+  API_KEY = CryptoMarketGetAPIKey();
+  API_SECRET = CryptoMarketGetAPISecret();
+  
+  var timestamp = Date.parse(new Date()) / 1000; //divided by 1000 because JavaScript's function returns miliseconds
+  
+  rounded_date = Math.round(timestamp);
+  body = String(rounded_date)+'/v1/balance';
+  
+  // In Google Apps' JavaScript, we can calculate this like so:
+  // See signature = Utilities.computeHmacSignature(Utilities.MacAlgorithm.HMAC_MD5,
+  //                                             "input to hash",
+  //                                             "key",
+  //                                             Utilities.Charset.US_ASCII);
+  // Source: https://developers.google.com/apps-script/reference/utilities/utilities#computehmacsignaturealgorithm-value-key-charset
+  
+  var signature = Utilities.computeHmacSignature(Utilities.MacAlgorithm.HMAC_SHA_384,
+                                                 body,
+                                                 API_SECRET,
+                                                 Utilities.Charset.UTF_8);
+  headers = {
+    'X-MKT-APIKEY': API_KEY,
+    'X-MKT-SIGNATURE': String(toHexString(signature).join("")),
+    'X-MKT-TIMESTAMP': String(rounded_date)
+  };
+  
+  var options =
+      {
+        "headers" : headers,   
+        "muteHttpExceptions": true
+      };
+  
+  var response = UrlFetchApp.fetch( CryptoMarketGetAPIUrl()+'balance', options);
+  
+  if (response.getResponseCode() == 200) {
+    var json = response.getContentText();
+    var datos = JSON.parse(json);    
+    // iterate over each element in the array to find the required asset
+    for (var i = 0; i < datos["data"].length; i++){
+      // look for the entry with a matching code value
+      if (datos["data"][i].wallet == currency){  // we found it
+        // obj[i].name is the matched result
+        Logger.log ("FOUND: " + datos["data"][[i]]["balance"]);
+        indice = i; 
+      }
+    } 
+    return (parseFloat(datos["data"][[indice]]["balance"]));
+  } else if (response.getResponseCode() == 401 ) {
+    return ( "Incorrect API Key or Secret!" );
+  } else if (response.getResponseCode() == 429 ) {
+    return ( "Too Many requests - Please stop!" );
+  } else if (response.getResponseCode() == 503 ) {
+    return ( "Service Unavailable - We're temporarly offline due to maintenance. Please try again later." );}
+}  
+
+function CryptoMarketTicker(pair, item) { // Example pair = ETHCLP , item = last_price
+  // Refer to CryptoMarket's official documentation for the complete list of pairs and items at:
+  // https://developers.cryptomkt.com/es/?javascript#obtener-ticker
+  // If no parameters are passed, then default is ETHCLP last_price
+  
+  if (pair === undefined) {
+    pair = "ETHCLP";
+  } 
+  if (item === undefined) {
+    item = "last_price";
+  }   
+  var options =
+      {
+        "muteHttpExceptions": true
+      };
+  
+  var response = UrlFetchApp.fetch( CryptoMarketGetAPIUrl()+'ticker?market=' + pair, options);
+  
+  if (response.getResponseCode() == 200) {
+    var json = response.getContentText();
+    var datos = JSON.parse(json);    
+    // iterate over each element in the array to find the required asset
+    for (var i = 0; i < datos["data"].length; i++){
+      // look for the entry with a matching code value
+      if (datos["data"][i].market == pair){  // we found it
+        // obj[i].name is the matched result
+        Logger.log ("FOUND: " + datos["data"][[i]][item]);
+        indice = i; 
+      }
+    } 
+    return (parseFloat(datos["data"][[indice]][item]));
+  } else if (response.getResponseCode() == 401 ) {
+    return ( "Incorrect API Key or Secret!" );
+  } else if (response.getResponseCode() == 429 ) {
+    return ( "Too Many requests - Please stop!" );
+  } else if (response.getResponseCode() == 503 ) {
+    return ( "Service Unavailable - We're temporarly offline due to maintenance. Please try again later." );}
+}  

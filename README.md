@@ -30,5 +30,5 @@ Please refer to the "Sample Usage" tab to see examples:
 
 **Donations are welcome to ETH 0x0150AbF80136eA289860d12Ca01335BdF58AD80d**
 
-#POWERED BY
+# POWERED BY
 [![N|Solid](https://www.cryptomkt.com/static/principal/img/cryptomarket-purp.png)](https://www.cryptomkt.com/static/principal/img/cryptomarket-purp.png)
